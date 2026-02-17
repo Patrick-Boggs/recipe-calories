@@ -232,6 +232,7 @@ KNOWN_KCAL_PER_100G = {
     "beef stock": 13,
     "vegetable broth": 3,
     "vegetable stock": 5,
+    "broth": 5,            # generic broth fallback
     "bone broth": 13,
     "coconut milk": 230,
     "cream cheese": 342,
@@ -269,6 +270,14 @@ KNOWN_KCAL_PER_100G = {
     "papardelle": 371,     # alternate spelling
     "ras el hanout": 285,  # Moroccan spice blend, approximate
     "ground ginger": 335,  # dried/ground ginger, USDA
+    "pancetta": 393,       # cured pork belly
+    "swiss chard": 19,
+    "chard": 19,
+    "white beans": 114,    # cooked/canned
+    "cannellini beans": 114,
+    "puff pastry": 558,    # frozen, ready-to-bake
+    "pie dough": 366,
+    "pie crust": 366,
 }
 
 # ---------------------------------------------------------------------------
@@ -336,7 +345,31 @@ def _fallback_scrape_html(html):
             servings_text = match.group(0)
             break
 
-    return title, servings_text, ingredients
+    # Extract instructions: look for <ol> with multiple <li>, or long <p> blocks
+    # that read like preparation steps (sentences, not ingredient lines).
+    instructions = []
+    # Strategy 1: ordered list items (most structured recipe sites)
+    for ol in soup.find_all("ol"):
+        items = [li.get_text(" ", strip=True) for li in ol.find_all("li")]
+        if len(items) > len(instructions):
+            instructions = items
+    # Strategy 2: <p> tags that look like prose steps (long sentences, verbs)
+    if not instructions:
+        _step_re = re.compile(
+            r"\b(heat|preheat|cook|bake|stir|add|combine|mix|whisk|fold|place|"
+            r"pour|bring|simmer|boil|reduce|remove|let|set|serve|season|toss|"
+            r"transfer|cover|drain|slice|chop|cut|spread|layer|roll|brush)\b",
+            re.IGNORECASE,
+        )
+        for p_tag in soup.find_all("p"):
+            text = p_tag.get_text(" ", strip=True)
+            # Must be a real sentence (>40 chars) and contain a cooking verb
+            if len(text) > 40 and _step_re.search(text):
+                # Skip if it looks like an ingredient line
+                if not _ingredient_re.search(text):
+                    instructions.append(text)
+
+    return title, servings_text, ingredients, instructions
 
 
 def scrape_recipe(url):
@@ -379,7 +412,7 @@ def scrape_recipe(url):
 
     if not scraper or not ingredients:
         # No schema found — fall back to plain HTML extraction
-        title, yields_str, ingredients = _fallback_scrape_html(resp.text)
+        title, yields_str, ingredients, _instructions = _fallback_scrape_html(resp.text)
 
     servings = _parse_servings(yields_str)
 
@@ -427,8 +460,16 @@ def _normalize_raw_ingredient(raw):
     """Fix common unit typos/variants before parsing."""
     # Normalize smart quotes/curly apostrophes to plain apostrophe
     result = raw.replace("\u2019", "'").replace("\u2018", "'")
+    # Fix broken hyphens from HTML line-breaks: "sodium- free" → "sodium-free"
+    result = re.sub(r"(\w)- (\w)", r"\1-\2", result)
     for pattern, replacement in UNIT_NORMALIZATIONS:
         result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    # Strip parenthetical conversion notes: "(115 grams or 3/4 cup)" etc.
+    result = re.sub(
+        r"\s*\([^)]*(?:grams?|oz|ounces?|cups?|ml|liters?|litres?|lbs?|pounds?|kg|inch|inches|cm)\b[^)]*\)",
+        "", result, flags=re.IGNORECASE,
+    )
+    result = re.sub(r"  +", " ", result).strip()
     # "1 x 400g can ..." → "400g ..."  (multiply out the N × weight)
     match = re.match(
         r"^(\d+)\s*x\s*(\d+)\s*(g|kg|oz|lb|lbs|ml|l)\b\s*(?:can|cans|tin|tins|bag|bags|box|boxes|packet|packets|package|packages|jar|jars|bottle|bottles|carton|cartons|pouch|pouches)?\s*(.*)$",
@@ -614,6 +655,10 @@ def _clean_ingredient_name(name):
         "unbleached", "bleached", "sifted", "packed",
         "large", "medium", "small", "extra-large",
         "grated", "shredded", "chopped", "diced", "minced", "sliced",
+        # Dietary / label adjectives that obscure the base ingredient
+        "low-sodium", "sodium-free", "no-salt-added",
+        "low-fat", "reduced-fat", "full-fat", "nonfat", "fat-free",
+        "organic", "boneless", "skinless",
     ]
     for word in remove_words:
         cleaned = re.sub(r"\b" + re.escape(word) + r"\b", "", cleaned)

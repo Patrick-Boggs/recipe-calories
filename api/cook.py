@@ -10,9 +10,17 @@ import json
 import traceback
 from http.server import BaseHTTPRequestHandler
 
+import os
+import pathlib
+
 import requests
 import cloudscraper
 from recipe_scrapers import scrape_html
+
+# Point NLTK to bundled data before importing recipe_logic
+# (recipe_logic imports ingredient-parser-nlp which needs NLTK data)
+os.environ["NLTK_DATA"] = str(pathlib.Path(__file__).parent / "nltk_data")
+from api.recipe_logic import _fallback_scrape_html
 
 
 class handler(BaseHTTPRequestHandler):
@@ -77,46 +85,51 @@ def scrape_cook_data(url):
         try:
             scraper = scrape_html(resp.text, org_url=url, supported_only=False)
         except Exception:
-            raise ValueError("Could not parse recipe from this URL.")
-
-    if scraper is None:
-        raise ValueError("Could not parse recipe from this URL.")
+            scraper = None
 
     result = {"title": None, "ingredients": [], "instructions": [], "prep_time": None, "cook_time": None, "total_time": None}
 
-    try:
-        result["title"] = scraper.title()
-    except Exception:
-        pass
+    if scraper is not None:
+        try:
+            result["title"] = scraper.title()
+        except Exception:
+            pass
 
-    try:
-        result["ingredients"] = scraper.ingredients()
-    except Exception:
-        pass
+        try:
+            result["ingredients"] = scraper.ingredients()
+        except Exception:
+            pass
 
-    try:
-        raw = scraper.instructions()
-        if isinstance(raw, str):
-            result["instructions"] = [s.strip() for s in raw.split("\n") if s.strip()]
-        elif isinstance(raw, list):
-            result["instructions"] = raw
-    except Exception:
-        pass
+        try:
+            raw = scraper.instructions()
+            if isinstance(raw, str):
+                result["instructions"] = [s.strip() for s in raw.split("\n") if s.strip()]
+            elif isinstance(raw, list):
+                result["instructions"] = raw
+        except Exception:
+            pass
 
-    try:
-        result["prep_time"] = scraper.prep_time()
-    except Exception:
-        pass
+        try:
+            result["prep_time"] = scraper.prep_time()
+        except Exception:
+            pass
 
-    try:
-        result["cook_time"] = scraper.cook_time()
-    except Exception:
-        pass
+        try:
+            result["cook_time"] = scraper.cook_time()
+        except Exception:
+            pass
 
-    try:
-        result["total_time"] = scraper.total_time()
-    except Exception:
-        pass
+        try:
+            result["total_time"] = scraper.total_time()
+        except Exception:
+            pass
+
+    # Fall back to plain HTML extraction if scraper failed or found nothing
+    if not result["ingredients"] and not result["instructions"]:
+        title, _servings, ingredients, instructions = _fallback_scrape_html(resp.text)
+        result["title"] = result["title"] or title
+        result["ingredients"] = ingredients
+        result["instructions"] = instructions
 
     if not result["ingredients"] and not result["instructions"]:
         raise ValueError("No ingredients or instructions found for this recipe.")
