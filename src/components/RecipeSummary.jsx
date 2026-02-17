@@ -8,6 +8,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
+import DevLabel from './DevLabel'
 
 const SCALES = [0.5, 1, 2, 3, 4]
 
@@ -44,7 +45,8 @@ export default function RecipeSummary({ recipe, scale, onScaleChange, favorited,
     : null
 
   return (
-    <Card>
+    <Card sx={{ position: 'relative' }}>
+      <DevLabel name="Identity" />
       <CardContent>
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
           <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.3, mb: 2 }}>

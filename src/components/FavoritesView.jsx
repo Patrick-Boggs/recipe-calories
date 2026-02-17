@@ -3,6 +3,8 @@ import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
+import Box from '@mui/material/Box'
+import DevLabel from './DevLabel'
 
 const PLACEHOLDER_FAVORITES = [
   { title: 'Chicken Tikka Masala', servings: 6, total_kcal: 2450, per_serving: 408, ingredients: [] },
@@ -12,7 +14,9 @@ const PLACEHOLDER_FAVORITES = [
 
 export default function FavoritesView({ onSelectRecipe }) {
   return (
-    <Stack spacing={2}>
+    <Box sx={{ position: 'relative' }}>
+      <DevLabel name="Favorites" />
+      <Stack spacing={2} sx={{ pt: 2 }}>
       <Typography variant="body2" color="text.secondary">
         Tap a recipe to view it.
       </Typography>
@@ -31,5 +35,6 @@ export default function FavoritesView({ onSelectRecipe }) {
         </Card>
       ))}
     </Stack>
+    </Box>
   )
 }

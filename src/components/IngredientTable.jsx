@@ -4,6 +4,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import Stack from '@mui/material/Stack'
 import Chip from '@mui/material/Chip'
+import DevLabel from './DevLabel'
 
 const STATUS_COLORS = {
   ok: '#4ade80',
@@ -87,7 +88,8 @@ function IngredientRow({ ingredient, scale }) {
 
 export default function IngredientTable({ ingredients, scale }) {
   return (
-    <Card>
+    <Card sx={{ position: 'relative' }}>
+      <DevLabel name="Content" />
       <CardContent>
         <Typography
           variant="subtitle2"

@@ -15,7 +15,10 @@ import AcquisitionCard from './components/AcquisitionCard'
 import LoadingIndicator from './components/LoadingIndicator'
 import RecipeSummary from './components/RecipeSummary'
 import IngredientTable from './components/IngredientTable'
+import CookIdentity from './components/CookIdentity'
+import CookContent from './components/CookContent'
 import FavoritesView from './components/FavoritesView'
+import DevLabel from './components/DevLabel'
 
 function DebugDetails({ debug }) {
   const [open, setOpen] = useState(false)
@@ -69,7 +72,9 @@ function DebugDetails({ debug }) {
 
 export default function App() {
   const [view, setView] = useState('recipe')
+  const [mode, setMode] = useState('cook')
   const [recipe, setRecipe] = useState(null)
+  const [cookData, setCookData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [debug, setDebug] = useState(null)
@@ -82,11 +87,14 @@ export default function App() {
     setError(null)
     setDebug(null)
     setRecipe(null)
+    setCookData(null)
     setScale(1)
     setFavorited(false)
 
+    const endpoint = mode === 'cook' ? '/api/cook' : '/api/calculate'
+
     try {
-      const res = await fetch('/api/calculate', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -108,7 +116,11 @@ export default function App() {
         return
       }
 
-      setRecipe(data)
+      if (mode === 'cook') {
+        setCookData(data)
+      } else {
+        setRecipe(data)
+      }
     } catch (err) {
       setError('Failed to connect to server. Please try again.')
       setDebug({ status: null, url, body: err.toString() })
@@ -126,12 +138,15 @@ export default function App() {
 
   const appBarTitle = view === 'favorites'
     ? 'Favorites'
-    : (recipe?.title || 'Recipe Calories')
+    : (mode === 'cook' && cookData?.title)
+      ? cookData.title
+      : (recipe?.title || 'Recipe Calories')
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
       <AppBar position="sticky">
-        <Toolbar>
+        <Toolbar sx={{ position: 'relative' }}>
+          <DevLabel name="AppBar" />
           {view === 'favorites' && (
             <IconButton
               edge="start"
@@ -165,7 +180,12 @@ export default function App() {
       <Container maxWidth="sm" sx={{ py: 2, flex: 1 }}>
         {view === 'recipe' && (
           <Stack spacing={2}>
-            <AcquisitionCard onAnalyze={handleAnalyze} loading={loading} />
+            <AcquisitionCard
+              onAnalyze={handleAnalyze}
+              loading={loading}
+              mode={mode}
+              onModeChange={setMode}
+            />
 
             {loading && <LoadingIndicator />}
 
@@ -176,7 +196,7 @@ export default function App() {
               </Alert>
             )}
 
-            {recipe && (
+            {mode === 'nutrition' && recipe && (
               <>
                 <RecipeSummary
                   recipe={recipe}
@@ -186,6 +206,17 @@ export default function App() {
                   onToggleFavorite={() => setFavorited(!favorited)}
                 />
                 <IngredientTable ingredients={recipe.ingredients} scale={scale} />
+              </>
+            )}
+
+            {mode === 'cook' && cookData && (
+              <>
+                <CookIdentity
+                  cookData={cookData}
+                  favorited={favorited}
+                  onToggleFavorite={() => setFavorited(!favorited)}
+                />
+                <CookContent instructions={cookData.instructions} />
               </>
             )}
           </Stack>
