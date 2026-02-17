@@ -1,10 +1,21 @@
-import { useState, useCallback } from 'react'
-import UrlInput from './components/UrlInput'
+import { useState } from 'react'
+import AppBar from '@mui/material/AppBar'
+import Toolbar from '@mui/material/Toolbar'
+import Typography from '@mui/material/Typography'
+import IconButton from '@mui/material/IconButton'
+import Container from '@mui/material/Container'
+import Stack from '@mui/material/Stack'
+import Box from '@mui/material/Box'
+import Alert from '@mui/material/Alert'
+import Tooltip from '@mui/material/Tooltip'
+import FavoriteIcon from '@mui/icons-material/Favorite'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import BugReportIcon from '@mui/icons-material/BugReport'
+import AcquisitionCard from './components/AcquisitionCard'
 import LoadingIndicator from './components/LoadingIndicator'
 import RecipeSummary from './components/RecipeSummary'
 import IngredientTable from './components/IngredientTable'
-import ScaleSelector from './components/ScaleSelector'
-import './App.css'
+import FavoritesView from './components/FavoritesView'
 
 function DebugDetails({ debug }) {
   const [open, setOpen] = useState(false)
@@ -15,23 +26,56 @@ function DebugDetails({ debug }) {
   ].join('\n\n')
 
   return (
-    <div className="debug-section">
-      <button className="debug-toggle" onClick={() => setOpen(!open)}>
+    <Box sx={{ mt: 1 }}>
+      <Typography
+        component="button"
+        onClick={() => setOpen(!open)}
+        sx={{
+          background: 'none',
+          border: 'none',
+          color: 'text.secondary',
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          textDecoration: 'underline',
+          p: 0,
+        }}
+      >
         {open ? 'Hide' : 'Show'} Debug Details
-      </button>
+      </Typography>
       {open && (
-        <pre className="debug-pre">{text}</pre>
+        <Box
+          component="pre"
+          sx={{
+            mt: 1,
+            p: 1.5,
+            bgcolor: '#0d0d1a',
+            borderRadius: 1,
+            fontFamily: 'monospace',
+            fontSize: '0.75rem',
+            color: 'text.secondary',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            maxHeight: 300,
+            overflowY: 'auto',
+            userSelect: 'all',
+          }}
+        >
+          {text}
+        </Box>
       )}
-    </div>
+    </Box>
   )
 }
 
 export default function App() {
+  const [view, setView] = useState('recipe')
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [debug, setDebug] = useState(null)
   const [scale, setScale] = useState(1)
+  const [favorited, setFavorited] = useState(false)
+  const [debugEnabled, setDebugEnabled] = useState(true)
 
   async function handleAnalyze(url) {
     setLoading(true)
@@ -39,6 +83,7 @@ export default function App() {
     setDebug(null)
     setRecipe(null)
     setScale(1)
+    setFavorited(false)
 
     try {
       const res = await fetch('/api/calculate', {
@@ -72,33 +117,84 @@ export default function App() {
     }
   }
 
+  function handleSelectFavorite(fav) {
+    setRecipe(fav)
+    setScale(1)
+    setFavorited(true)
+    setView('recipe')
+  }
+
+  const appBarTitle = view === 'favorites'
+    ? 'Favorites'
+    : (recipe?.title || 'Recipe Calories')
+
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Recipe Calories</h1>
-        <p className="subtitle">Paste a recipe URL to get a calorie breakdown</p>
-      </header>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+      <AppBar position="sticky">
+        <Toolbar>
+          {view === 'favorites' && (
+            <IconButton
+              edge="start"
+              color="inherit"
+              onClick={() => setView('recipe')}
+              sx={{ mr: 1 }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+          <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
+            {appBarTitle}
+          </Typography>
+          <Tooltip title={debugEnabled ? 'Debug on' : 'Debug off'}>
+            <IconButton
+              color="inherit"
+              onClick={() => setDebugEnabled(!debugEnabled)}
+              sx={{ opacity: debugEnabled ? 1 : 0.4 }}
+            >
+              <BugReportIcon />
+            </IconButton>
+          </Tooltip>
+          {view === 'recipe' && (
+            <IconButton color="inherit" onClick={() => setView('favorites')}>
+              <FavoriteIcon />
+            </IconButton>
+          )}
+        </Toolbar>
+      </AppBar>
 
-      <main className="app-main">
-        <UrlInput onAnalyze={handleAnalyze} loading={loading} />
+      <Container maxWidth="sm" sx={{ py: 2, flex: 1 }}>
+        {view === 'recipe' && (
+          <Stack spacing={2}>
+            <AcquisitionCard onAnalyze={handleAnalyze} loading={loading} />
 
-        {loading && <LoadingIndicator />}
+            {loading && <LoadingIndicator />}
 
-        {error && (
-          <div className="error-card">
-            <p>{error}</p>
-            {debug && <DebugDetails debug={debug} />}
-          </div>
+            {error && (
+              <Alert severity="error" variant="outlined">
+                {error}
+                {debugEnabled && debug && <DebugDetails debug={debug} />}
+              </Alert>
+            )}
+
+            {recipe && (
+              <>
+                <RecipeSummary
+                  recipe={recipe}
+                  scale={scale}
+                  onScaleChange={setScale}
+                  favorited={favorited}
+                  onToggleFavorite={() => setFavorited(!favorited)}
+                />
+                <IngredientTable ingredients={recipe.ingredients} scale={scale} />
+              </>
+            )}
+          </Stack>
         )}
 
-        {recipe && (
-          <>
-            <RecipeSummary recipe={recipe} scale={scale} />
-            <ScaleSelector scale={scale} onScaleChange={setScale} />
-            <IngredientTable ingredients={recipe.ingredients} scale={scale} />
-          </>
+        {view === 'favorites' && (
+          <FavoritesView onSelectRecipe={handleSelectFavorite} />
         )}
-      </main>
-    </div>
+      </Container>
+    </Box>
   )
 }
