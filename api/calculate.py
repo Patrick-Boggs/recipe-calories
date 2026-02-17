@@ -11,7 +11,18 @@ import os
 import traceback
 from http.server import BaseHTTPRequestHandler
 
-from api.recipe_logic import calculate_recipe
+# Point NLTK to bundled data before importing recipe_logic
+# (ingredient-parser-nlp needs averaged_perceptron_tagger_eng)
+import pathlib
+os.environ["NLTK_DATA"] = str(pathlib.Path(__file__).parent / "nltk_data")
+
+# Defer the import so we can catch and report errors
+_import_error = None
+try:
+    from api.recipe_logic import calculate_recipe
+except Exception:
+    _import_error = traceback.format_exc()
+    calculate_recipe = None
 
 USDA_API_KEY = os.environ.get("USDA_API_KEY")
 
@@ -30,6 +41,10 @@ class handler(BaseHTTPRequestHandler):
         self._send_json(200, {})
 
     def do_POST(self):
+        if _import_error:
+            self._send_json(500, {"error": f"Server import error:\n{_import_error}"})
+            return
+
         try:
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
