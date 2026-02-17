@@ -152,3 +152,4 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 10. **Connect Vercel to GitHub** — enable auto-deploy on push
 11. **Custom domain**
 12. **Vercel function timeout** — 10s on free tier; Nutrition mode with many ingredients may be slow
+13. **Camera recipe capture** — use phone camera + Claude API vision to extract recipe data from photos of cookbooks/recipe cards
