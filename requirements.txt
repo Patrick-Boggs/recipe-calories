@@ -1,0 +1,6 @@
+pint
+cloudscraper
+requests
+ingredient-parser-nlp
+beautifulsoup4
+recipe-scrapers
