@@ -685,7 +685,8 @@ def search_usda_calories(ingredient_name, api_key):
         raise ValueError("USDA API rate limit reached (1000/hour). Try again later.")
     if resp.status_code == 400:
         return None, "USDA search failed (bad query)"
-    resp.raise_for_status()
+    if not resp.ok:
+        return None, f"USDA API error (HTTP {resp.status_code})"
 
     data = resp.json()
     foods = data.get("foods", [])

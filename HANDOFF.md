@@ -57,6 +57,8 @@ The app uses Material UI with a dark theme (`#e94560` primary, `#1a1a2e` backgro
 
 ## Two Modes
 
+Both endpoints are called **in parallel** when the user hits Analyze. Results are cached in state so switching modes is instant. Each mode has independent loading state — the spinner only shows for the currently active mode.
+
 ### Cook Mode (default)
 - Calls `POST /api/cook` — scrapes title, ingredients, instructions, timing
 - **No USDA lookup** — fast response
@@ -67,6 +69,7 @@ The app uses Material UI with a dark theme (`#e94560` primary, `#1a1a2e` backgro
 - Calls `POST /api/calculate` — full ingredient parsing + USDA calorie lookup
 - Shows calorie breakdown per ingredient with status dots (ok/skipped/not found)
 - Recipe scaling (½x, 1x, 2x, 3x, 4x) — frontend-only multiplication
+- Servings scale with multiplier; per-serving kcal stays fixed (calorie density is constant)
 
 ## Key Decisions & Gotchas
 
@@ -83,10 +86,16 @@ The USDA API key is stored as a Vercel environment variable (`USDA_API_KEY`), se
 `vercel dev` has a known issue with Vite where the SPA catch-all rewrite causes Vite's HMR module requests to be served as `index.html`. The `vercel.json` was stripped to minimal config to mitigate, but local dev with the Python API still doesn't work reliably. **Current workflow: deploy to Vercel and test via the .app URL.**
 
 ### Debug toggle
-The AppBar has a bug icon that toggles debug details on/off (on by default). When enabled, API errors show HTTP status, request URL, and full response body. This should be removed or defaulted to off before production release.
+The AppBar has a bug icon that toggles debug details on/off (on by default). When enabled, API errors show HTTP status, request URL, and full response body. Includes a **Copy** button that copies debug text to clipboard for easy sharing. This should be removed or defaulted to off before production release.
 
 ### DevLabel badges
 Yellow badges label each UI region (AppBar, Acquisition, Identity, Content, Favorites) for development communication. These are hardcoded on and should be removed before production release.
+
+### USDA API error handling
+`recipe_logic.py` line ~688 originally used `resp.raise_for_status()` which crashed the entire recipe if any single USDA API call returned a 500. Now uses a graceful check: `if not resp.ok: return None, f"USDA API error (HTTP {resp.status_code})"` — individual ingredient failures are marked "not found" while the rest of the recipe processes normally.
+
+### Parallel fetch
+Both `/api/cook` and `/api/calculate` fire simultaneously in `handleAnalyze()`. Each has independent loading state (`cookLoading`, `nutritionLoading`). The displayed spinner is derived from the current mode: `const loading = mode === 'cook' ? cookLoading : nutritionLoading`. Clearing a previous URL's data happens before both fetches start.
 
 ### Deleted files
 - `recipe_calculator.py` — Original 1397-line desktop app (customtkinter GUI). Deleted as it's unused by the React app. The backend logic lives in `api/recipe_logic.py`.
@@ -97,11 +106,13 @@ Yellow badges label each UI region (AppBar, Acquisition, Identity, Content, Favo
 
 - **Cook mode**: scraping ingredients + instructions from allrecipes.com
 - **Nutrition mode**: full ingredient parsing, unit conversion, USDA calorie lookup
-- Recipe scaling (Nutrition mode, frontend-only)
-- Cook/Nutrition mode toggle
+- **Parallel fetch** — both `/api/cook` and `/api/calculate` fire simultaneously on Analyze; switching modes is instant if data is cached, or shows loading if still in progress
+- **Recipe scaling** (Nutrition mode) — servings scale with multiplier, per-serving kcal stays fixed (calorie density doesn't change with batch size)
+- Cook/Nutrition mode toggle with Cook as default
 - Checkable ingredient list in Cook mode
 - Favorites toggle button (state only, no persistence)
-- Debug toggle in AppBar
+- Debug toggle in AppBar with copy-to-clipboard button on debug output
+- **Graceful USDA error handling** — individual ingredient USDA API failures marked "not found" instead of crashing the entire recipe
 - MUI dark theme with mobile-first layout
 - PWA manifest and service worker
 - Deployed and live on Vercel free tier
@@ -113,6 +124,9 @@ Yellow badges label each UI region (AppBar, Acquisition, Identity, Content, Favo
 - Offline behavior (service worker caches app shell, but API calls need network)
 - Edge cases: recipes with no servings, no ingredients, no instructions, very long lists
 - Cook mode timing display with various time formats from different sites
+
+### Known Edge Cases
+- **Inline conversion notes in ingredients** — sites like Smitten Kitchen embed notes in ingredient strings (e.g. `4 ounces (115 grams or 3/4 to 1 cup) 1/4-inch-diced pancetta`) which confuse the ingredient parser and cause USDA lookup failures. Gracefully handled as "not found" but could be improved by stripping parenthetical text before parsing.
 
 ## Deployment
 
@@ -128,7 +142,7 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 ## Next Steps
 
 ### Near-term
-1. **Fix Nutrition mode scaling** — scale selector has known issues that need troubleshooting
+1. ~~**Fix Nutrition mode scaling**~~ — ✅ Done. Servings now scale with multiplier, per-serving kcal stays fixed.
 2. **Error recovery UX** — retry button on failed requests without re-pasting the URL; clear/reset button to start fresh
 3. **Checkable preparation steps in Cook mode** — tap to check off/strikethrough steps like the ingredient list
 4. **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card

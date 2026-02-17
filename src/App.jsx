@@ -22,29 +22,54 @@ import DevLabel from './components/DevLabel'
 
 function DebugDetails({ debug }) {
   const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const text = [
     `HTTP Status: ${debug.status ?? 'N/A'}`,
     `Request URL: ${debug.url}`,
     `Response:\n${debug.body}`,
   ].join('\n\n')
 
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   return (
     <Box sx={{ mt: 1 }}>
-      <Typography
-        component="button"
-        onClick={() => setOpen(!open)}
-        sx={{
-          background: 'none',
-          border: 'none',
-          color: 'text.secondary',
-          fontSize: '0.8rem',
-          cursor: 'pointer',
-          textDecoration: 'underline',
-          p: 0,
-        }}
-      >
-        {open ? 'Hide' : 'Show'} Debug Details
-      </Typography>
+      <Stack direction="row" spacing={1}>
+        <Typography
+          component="button"
+          onClick={() => setOpen(!open)}
+          sx={{
+            background: 'none',
+            border: 'none',
+            color: 'text.secondary',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            p: 0,
+          }}
+        >
+          {open ? 'Hide' : 'Show'} Debug Details
+        </Typography>
+        <Typography
+          component="button"
+          onClick={handleCopy}
+          sx={{
+            background: 'none',
+            border: 'none',
+            color: 'text.secondary',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            p: 0,
+          }}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </Typography>
+      </Stack>
       {open && (
         <Box
           component="pre"
