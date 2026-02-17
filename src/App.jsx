@@ -75,58 +75,64 @@ export default function App() {
   const [mode, setMode] = useState('cook')
   const [recipe, setRecipe] = useState(null)
   const [cookData, setCookData] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [cookLoading, setCookLoading] = useState(false)
+  const [nutritionLoading, setNutritionLoading] = useState(false)
   const [error, setError] = useState(null)
   const [debug, setDebug] = useState(null)
   const [scale, setScale] = useState(1)
   const [favorited, setFavorited] = useState(false)
   const [debugEnabled, setDebugEnabled] = useState(true)
 
-  async function handleAnalyze(url) {
-    setLoading(true)
+  const loading = mode === 'cook' ? cookLoading : nutritionLoading
+
+  async function fetchEndpoint(endpoint, url) {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+    const rawText = await res.text()
+    let data
+    try {
+      data = JSON.parse(rawText)
+    } catch {
+      throw { userError: 'Server returned non-JSON response.', debug: { status: res.status, url, body: rawText } }
+    }
+    if (!res.ok) {
+      throw { userError: data.error || 'Something went wrong.', debug: { status: res.status, url, body: rawText } }
+    }
+    return data
+  }
+
+  function handleAnalyze(url) {
     setError(null)
     setDebug(null)
     setRecipe(null)
     setCookData(null)
     setScale(1)
     setFavorited(false)
+    setCookLoading(true)
+    setNutritionLoading(true)
 
-    const endpoint = mode === 'cook' ? '/api/cook' : '/api/calculate'
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+    fetchEndpoint('/api/cook', url)
+      .then((data) => setCookData(data))
+      .catch((err) => {
+        if (mode === 'cook') {
+          setError(err.userError || 'Failed to connect to server.')
+          setDebug(err.debug || { status: null, url, body: String(err) })
+        }
       })
+      .finally(() => setCookLoading(false))
 
-      const rawText = await res.text()
-      let data
-      try {
-        data = JSON.parse(rawText)
-      } catch {
-        setError('Server returned non-JSON response.')
-        setDebug({ status: res.status, url, body: rawText })
-        return
-      }
-
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong.')
-        setDebug({ status: res.status, url, body: rawText })
-        return
-      }
-
-      if (mode === 'cook') {
-        setCookData(data)
-      } else {
-        setRecipe(data)
-      }
-    } catch (err) {
-      setError('Failed to connect to server. Please try again.')
-      setDebug({ status: null, url, body: err.toString() })
-    } finally {
-      setLoading(false)
-    }
+    fetchEndpoint('/api/calculate', url)
+      .then((data) => setRecipe(data))
+      .catch((err) => {
+        if (mode === 'nutrition') {
+          setError(err.userError || 'Failed to connect to server.')
+          setDebug(err.debug || { status: null, url, body: String(err) })
+        }
+      })
+      .finally(() => setNutritionLoading(false))
   }
 
   function handleSelectFavorite(fav) {
@@ -187,9 +193,9 @@ export default function App() {
               onModeChange={setMode}
             />
 
-            {loading && <LoadingIndicator />}
+            {loading && !error && <LoadingIndicator />}
 
-            {error && (
+            {!loading && error && (
               <Alert severity="error" variant="outlined">
                 {error}
                 {debugEnabled && debug && <DebugDetails debug={debug} />}
