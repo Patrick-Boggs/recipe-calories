@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import UrlInput from './components/UrlInput'
 import LoadingIndicator from './components/LoadingIndicator'
 import RecipeSummary from './components/RecipeSummary'
@@ -6,15 +6,37 @@ import IngredientTable from './components/IngredientTable'
 import ScaleSelector from './components/ScaleSelector'
 import './App.css'
 
+function DebugDetails({ debug }) {
+  const [open, setOpen] = useState(false)
+  const text = [
+    `HTTP Status: ${debug.status ?? 'N/A'}`,
+    `Request URL: ${debug.url}`,
+    `Response:\n${debug.body}`,
+  ].join('\n\n')
+
+  return (
+    <div className="debug-section">
+      <button className="debug-toggle" onClick={() => setOpen(!open)}>
+        {open ? 'Hide' : 'Show'} Debug Details
+      </button>
+      {open && (
+        <pre className="debug-pre">{text}</pre>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [debug, setDebug] = useState(null)
   const [scale, setScale] = useState(1)
 
   async function handleAnalyze(url) {
     setLoading(true)
     setError(null)
+    setDebug(null)
     setRecipe(null)
     setScale(1)
 
@@ -24,16 +46,27 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
-      const data = await res.json()
+
+      const rawText = await res.text()
+      let data
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        setError('Server returned non-JSON response.')
+        setDebug({ status: res.status, url, body: rawText })
+        return
+      }
 
       if (!res.ok) {
         setError(data.error || 'Something went wrong.')
+        setDebug({ status: res.status, url, body: rawText })
         return
       }
 
       setRecipe(data)
     } catch (err) {
       setError('Failed to connect to server. Please try again.')
+      setDebug({ status: null, url, body: err.toString() })
     } finally {
       setLoading(false)
     }
@@ -54,6 +87,7 @@ export default function App() {
         {error && (
           <div className="error-card">
             <p>{error}</p>
+            {debug && <DebugDetails debug={debug} />}
           </div>
         )}
 

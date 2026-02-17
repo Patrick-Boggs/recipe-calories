@@ -282,3 +282,33 @@ body {
   color: var(--text-secondary);
   font-style: italic;
 }
+
+/* Debug */
+.debug-section {
+  margin-top: 10px;
+}
+
+.debug-toggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.debug-pre {
+  margin-top: 8px;
+  padding: 12px;
+  background: #0d0d1a;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+  user-select: all;
+}
