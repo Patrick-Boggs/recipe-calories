@@ -293,6 +293,12 @@ def _fallback_scrape_html(html):
     """
     soup = BeautifulSoup(html, "html.parser")
 
+    # Remove comment sections so they don't pollute instruction extraction.
+    for el in soup.find_all(id=re.compile(r"comment|respond|reply|discussion", re.I)):
+        el.decompose()
+    for el in soup.find_all(class_=re.compile(r"comment|respond|reply|discussion", re.I)):
+        el.decompose()
+
     # Prefer <title> (strip common " — Site Name" / " | Site Name" suffixes),
     # then fall back to the first <h1> or <h2>.
     title = None
@@ -353,20 +359,34 @@ def _fallback_scrape_html(html):
         items = [li.get_text(" ", strip=True) for li in ol.find_all("li")]
         if len(items) > len(instructions):
             instructions = items
-    # Strategy 2: <p> tags that look like prose steps (long sentences, verbs)
+    # Strategy 2: <p> tags that look like imperative cooking steps.
+    # To avoid blog headnotes/prose, require the sentence (or a sub-heading
+    # prefix like "Make filling:") to START with a cooking verb.
     if not instructions:
-        _step_re = re.compile(
-            r"\b(heat|preheat|cook|bake|stir|add|combine|mix|whisk|fold|place|"
+        # Step prefix like "Make lids:", "Prepare sauce:", "For the crust:" — strong signal
+        _step_prefix_re = re.compile(
+            r"^(?:make|prepare|assemble|for\s+the)\s+[\w\s]+:", re.IGNORECASE,
+        )
+        # Imperative cooking verb near the start of the sentence
+        _step_start_re = re.compile(
+            r"^(?:\w+\s+){0,4}"  # up to 4 leading words
+            r"(heat|preheat|cook|bake|stir|add|combine|mix|whisk|fold|place|"
             r"pour|bring|simmer|boil|reduce|remove|let|set|serve|season|toss|"
-            r"transfer|cover|drain|slice|chop|cut|spread|layer|roll|brush)\b",
+            r"transfer|cover|drain|slice|chop|cut|spread|layer|roll|brush|"
+            r"divide|arrange|wipe|melt|assemble|prepare|rinse|pat|rub|"
+            r"line|grease|soak|knead|shape|form|trim|score|tent|rest|"
+            r"once|when|after|meanwhile)\b",
             re.IGNORECASE,
         )
-        for p_tag in soup.find_all("p"):
+        # Prefer content area (entry-content, post-content) to avoid sidebar prose
+        content_area = (
+            soup.find(class_=re.compile(r"entry-content|post-content|recipe-body", re.I))
+            or soup
+        )
+        for p_tag in content_area.find_all("p"):
             text = p_tag.get_text(" ", strip=True)
-            # Must be a real sentence (>40 chars) and contain a cooking verb
-            if len(text) > 40 and _step_re.search(text):
-                # Skip if it looks like an ingredient line
-                if not _ingredient_re.search(text):
+            if len(text) > 30 and not _ingredient_re.search(text):
+                if _step_prefix_re.search(text) or _step_start_re.search(text):
                     instructions.append(text)
 
     return title, servings_text, ingredients, instructions
