@@ -74,10 +74,10 @@ Both endpoints are called **in parallel** when the user hits Analyze. Results ar
 ## Key Decisions & Gotchas
 
 ### Import path
-`calculate.py` uses `from api.recipe_logic import calculate_recipe` — Vercel runs from the project root, not from inside `api/`.
+`calculate.py` and `cook.py` both use `from api.recipe_logic import ...` — Vercel runs from the project root, not from inside `api/`.
 
 ### NLTK data bundling
-`ingredient-parser-nlp` requires NLTK's `averaged_perceptron_tagger_eng` data. Vercel's filesystem is **read-only**, so NLTK can't download it at runtime. The data is pre-downloaded and committed in `api/nltk_data/`. `calculate.py` sets `NLTK_DATA` env var to that path before importing `recipe_logic`.
+`ingredient-parser-nlp` requires NLTK's `averaged_perceptron_tagger_eng` data. Vercel's filesystem is **read-only**, so NLTK can't download it at runtime. The data is pre-downloaded and committed in `api/nltk_data/`. Both `calculate.py` and `cook.py` set `NLTK_DATA` env var to that path before importing `recipe_logic`.
 
 ### API key
 The USDA API key is stored as a Vercel environment variable (`USDA_API_KEY`), set for production, preview, and development. It is **not** in the source code. The key is: `moiGbWOpJ9Qi9Dfgivf83MIFtB87btfVL4DBcBwL`.
@@ -102,12 +102,52 @@ Both `/api/cook` and `/api/calculate` fire simultaneously in `handleAnalyze()`. 
 - `src/components/UrlInput.jsx` — Replaced by `AcquisitionCard.jsx`
 - `src/components/ScaleSelector.jsx` — Absorbed into `RecipeSummary.jsx`
 
+## Recipe Scraping Pipeline
+
+Both endpoints share a **three-tier scraping fallback**:
+
+1. **`recipe-scrapers` library** (supported mode) — uses JSON-LD / Recipe schema. Works for allrecipes.com and most structured recipe sites.
+2. **`recipe-scrapers` generic mode** (`supported_only=False`) — reads JSON-LD / microdata from any site.
+3. **`_fallback_scrape_html()`** in `recipe_logic.py` — plain HTML extraction for sites with no structured data (e.g., Smitten Kitchen). Extracts:
+   - **Title** from `<title>` tag (strips site name suffixes) or `<h1>`/`<h2>`
+   - **Ingredients** from `<li>` elements matching ingredient patterns, or `<br>`-separated `<p>` tags
+   - **Instructions** from `<ol>` lists, or `<p>` tags matching imperative cooking patterns
+   - **Servings** from text matching "N servings/portions"
+
+### Ingredient normalization pipeline (`_normalize_raw_ingredient()`)
+Applied before the NLP parser sees the string:
+1. Smart quotes → plain apostrophes
+2. Broken hyphens from HTML line-breaks: `sodium- free` → `sodium-free`
+3. Parenthetical conversion notes stripped: `4 ounces (115 grams or 3/4 cup)` → `4 ounces`
+4. Unit typo normalization: `lb's` → `lbs`, `tblsp` → `tbsp`
+5. Container multiplication: `1 x 400g can` → `400g`
+
+### Ingredient name cleaning (`_clean_ingredient_name()`)
+Applied before USDA lookup:
+- Strips "or"/"for" clauses: `butter or margarine` → `butter`
+- Removes recipe adjectives: fresh, melted, softened, chopped, diced, etc.
+- Removes dietary labels: low-sodium, sodium-free, organic, boneless, skinless, etc.
+- Collapses whitespace
+
+### Fallback instruction extraction
+Comment sections (`#comments`, `.comments-area`, etc.) are **decomposed from the DOM** before instruction scanning. Instructions are scoped to `.entry-content` or `.post-content` when available. Two strategies:
+- **Step prefix patterns**: `"Make lids:"`, `"Assemble:"`, `"For the crust:"` — accepted as instructions directly
+- **Imperative verb start**: paragraphs starting with cooking verbs (heat, preheat, combine, etc.) or temporal connectors (once, when, after, meanwhile)
+
+### Built-in lookup tables (`recipe_logic.py`)
+- **`DENSITY_G_PER_CUP`** (~117 entries) — volume-to-weight conversion for common cooking ingredients
+- **`WEIGHT_PER_ITEM`** (~46 entries) — per-item weights for countable ingredients (eggs, onions, etc.) with size variants
+- **`KNOWN_KCAL_PER_100G`** (~125 entries) — pre-computed calories to avoid USDA API mismatches. Includes pancetta, swiss chard, white beans, puff pastry, broths, and a generic "broth" fallback (5 kcal/100g)
+
 ## What Works
 
-- **Cook mode**: scraping ingredients + instructions from allrecipes.com
+- **Cook mode**: scraping ingredients + instructions from allrecipes.com and Smitten Kitchen (via HTML fallback)
 - **Nutrition mode**: full ingredient parsing, unit conversion, USDA calorie lookup
 - **Parallel fetch** — both `/api/cook` and `/api/calculate` fire simultaneously on Analyze; switching modes is instant if data is cached, or shows loading if still in progress
 - **Recipe scaling** (Nutrition mode) — servings scale with multiplier, per-serving kcal stays fixed (calorie density doesn't change with batch size)
+- **Inline parenthetical stripping** — conversion notes like `(115 grams or 3/4 cup)` are removed before parsing
+- **Broken hyphen normalization** — `sodium- free` → `sodium-free` before parsing
+- **Comment filtering** — blog comments removed from DOM before instruction extraction
 - Cook/Nutrition mode toggle with Cook as default
 - Checkable ingredient list in Cook mode
 - Favorites toggle button (state only, no persistence)
@@ -117,16 +157,24 @@ Both `/api/cook` and `/api/calculate` fire simultaneously in `handleAnalyze()`. 
 - PWA manifest and service worker
 - Deployed and live on Vercel free tier
 
-## What Hasn't Been Tested Yet
+## Testing
 
-- Other recipe sites beyond allrecipes.com (some may need Cloudflare bypass)
-- PWA "Add to Home Screen" install flow on mobile
-- Offline behavior (service worker caches app shell, but API calls need network)
-- Edge cases: recipes with no servings, no ingredients, no instructions, very long lists
-- Cook mode timing display with various time formats from different sites
+A `/testrecipe` skill is available in Claude Code to test any recipe URL against both live endpoints. Usage:
+```
+/testrecipe <url>
+```
+It checks for known issues (smart quotes, parse failures, USDA mismatches, missing fields) and reports a summary table.
 
-### Known Edge Cases
-- **Inline conversion notes in ingredients** — sites like Smitten Kitchen embed notes in ingredient strings (e.g. `4 ounces (115 grams or 3/4 to 1 cup) 1/4-inch-diced pancetta`) which confuse the ingredient parser and cause USDA lookup failures. Gracefully handled as "not found" but could be improved by stripping parenthetical text before parsing.
+### Tested Sites
+- **allrecipes.com** — works via `recipe-scrapers` (tier 1). Cook + Nutrition both pass.
+- **smittenkitchen.com** — works via HTML fallback (tier 3). Nutrition mode: all 10 ingredients `status: "ok"`, total kcal reasonable (~2,376). Cook mode: 6 instruction steps extracted correctly.
+
+### Known Remaining Issues (Smitten Kitchen)
+- **Some SK recipes still fail instruction extraction** — the regex-based approach struggles with SK's inconsistent formatting between posts. Not all recipes use "Make X:" prefixes or start paragraphs with cooking verbs.
+- **Missing ingredients** — SK embeds some ingredients in sub-sections (e.g., separate dough and filling ingredient lists). The `<br>`-separated `<p>` scanner only captures the largest block.
+- **White beans volume conversion** — uses water density fallback (912g for 2 cups). Real cooked beans are ~184g/cup. Needs a density table entry.
+- **`servings` null** — SK doesn't include structured serving counts.
+- **Raw string artifacts in Cook mode** — `all- purpose`, `sodium- free` appear in raw ingredient strings. Normalization only runs in the Nutrition pipeline, not on Cook mode's raw output.
 
 ## Deployment
 
@@ -141,17 +189,25 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 
 ## Next Steps
 
+### Immediate (next session)
+1. **Fix instruction extraction for more SK recipes** — a second SK recipe is known to fail. Options:
+   - Extend regex patterns for SK's formatting variations
+   - **Claude API fallback** (under consideration) — use Claude to extract structured recipe data from raw HTML as a third-tier fallback when regex fails. Tradeoffs: accurate but adds cost, latency, and another API dependency
+2. **Add density table entry for white beans** — fix the 2x overcounting from water density fallback
+
 ### Near-term
-1. ~~**Fix Nutrition mode scaling**~~ — ✅ Done. Servings now scale with multiplier, per-serving kcal stays fixed.
-2. **Error recovery UX** — retry button on failed requests without re-pasting the URL; clear/reset button to start fresh
-3. **Checkable preparation steps in Cook mode** — tap to check off/strikethrough steps like the ingredient list
-4. **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card
-5. **Ingredient scaling in Cook mode** — scale selector for ingredient quantities (double/halve a recipe while cooking)
-6. **Unit conversion toggle** — metric/imperial switch for ingredient quantities
-7. **Wire up Favorites persistence** — localStorage or backend storage, connect to FavoritesView
-8. **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
-9. **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
-10. **Fix vercel dev** — or document a local dev workflow that works
+1. ~~**Fix Nutrition mode scaling**~~ — ✅ Done.
+2. ~~**Fix ingredient parsing for non-standard sites**~~ — ✅ Done (parenthetical stripping, hyphen normalization, dietary adjective cleaning).
+3. **Error recovery UX** — retry button on failed requests without re-pasting the URL; clear/reset button to start fresh
+4. **Checkable preparation steps in Cook mode** — tap to check off/strikethrough steps like the ingredient list
+5. **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card
+6. **Ingredient scaling in Cook mode** — scale selector for ingredient quantities (double/halve a recipe while cooking)
+7. **Unit conversion toggle** — metric/imperial switch for ingredient quantities
+8. **Wire up Favorites persistence** — localStorage or backend storage, connect to FavoritesView
+9. **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
+10. **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
+11. **Fix vercel dev** — or document a local dev workflow that works
+12. **Normalize raw ingredient strings in Cook mode** — apply broken-hyphen fix to Cook mode output too
 
 ### Future
 1. **Visual polish** — typography, spacing, transitions, empty states — beyond MUI defaults
