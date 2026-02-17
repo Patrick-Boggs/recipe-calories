@@ -39,9 +39,10 @@ function StatBox({ value, label }) {
 }
 
 export default function RecipeSummary({ recipe, scale, onScaleChange, favorited, onToggleFavorite }) {
+  const scaledServings = recipe.servings != null ? Math.round(recipe.servings * scale) : null
   const totalKcal = Math.round(recipe.total_kcal * scale)
   const perServing = recipe.per_serving != null
-    ? Math.round(recipe.per_serving * scale)
+    ? Math.round(recipe.per_serving)
     : null
 
   return (
@@ -59,7 +60,7 @@ export default function RecipeSummary({ recipe, scale, onScaleChange, favorited,
 
         <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
           {recipe.servings != null && (
-            <StatBox value={recipe.servings} label="servings" />
+            <StatBox value={scaledServings} label="servings" />
           )}
           <StatBox value={totalKcal.toLocaleString()} label="total kcal" />
           {perServing != null && (
