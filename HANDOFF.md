@@ -190,7 +190,7 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 ## Next Steps
 
 ### Immediate (next session)
-1. **Fix instruction extraction for more SK recipes** — a second SK recipe is known to fail. Options:
+1. **Fix instruction extraction for more SK recipes** — this SK recipe fails to extract prep steps: https://smittenkitchen.com/2016/09/homemade-merguez-with-herby-yogurt/. Options:
    - Extend regex patterns for SK's formatting variations
    - **Claude API fallback** (under consideration) — use Claude to extract structured recipe data from raw HTML as a third-tier fallback when regex fails. Tradeoffs: accurate but adds cost, latency, and another API dependency
 2. **Add density table entry for white beans** — fix the 2x overcounting from water density fallback
