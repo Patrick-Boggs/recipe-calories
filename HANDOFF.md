@@ -2,7 +2,7 @@
 
 ## What Was Built
 
-Rebuilt a Python desktop recipe calorie calculator (`RecipeApp/recipe_calculator.py`, 1397 lines, customtkinter GUI) into a **React PWA + Python serverless backend** deployed on Vercel.
+Rebuilt a Python desktop recipe calorie calculator into a **React PWA + Python serverless backend** deployed on Vercel. The app now has two modes: **Cook mode** (default) for viewing ingredients and preparation steps, and **Nutrition mode** for calorie breakdown via USDA lookup.
 
 **Live URL:** https://recipe-calories-ten.vercel.app
 **GitHub:** https://github.com/Patrick-Boggs/recipe-calories
@@ -13,28 +13,60 @@ Rebuilt a Python desktop recipe calorie calculator (`RecipeApp/recipe_calculator
 ```
 RecipeApp_React/
 ├── api/
-│   ├── calculate.py          # Vercel Python serverless function (POST /api/calculate)
-│   ├── recipe_logic.py       # Backend logic extracted from original app (lines 1-799)
+│   ├── calculate.py          # Nutrition mode endpoint (POST /api/calculate)
+│   ├── cook.py               # Cook mode endpoint (POST /api/cook)
+│   ├── recipe_logic.py       # Backend logic for nutrition calculations
 │   └── nltk_data/            # Bundled NLTK data (required for ingredient parsing)
 ├── src/
-│   ├── App.jsx               # Main app — state management, API calls, debug panel
-│   ├── App.css
-│   ├── main.jsx
-│   ├── index.css             # All component styles
+│   ├── App.jsx               # Main app — state, routing, mode switching, API calls
+│   ├── App.css               # (empty — styles handled by MUI)
+│   ├── main.jsx              # Entry point — ThemeProvider, CssBaseline
+│   ├── index.css             # Minimal (safe-area padding only)
 │   └── components/
-│       ├── UrlInput.jsx      # URL input + Analyze button
-│       ├── LoadingIndicator.jsx
-│       ├── RecipeSummary.jsx # Title, servings, total/per-serving kcal
-│       ├── IngredientTable.jsx # Ingredient breakdown with status dots
-│       └── ScaleSelector.jsx # ½x, 1x, 2x, 3x, 4x (frontend-only scaling)
+│       ├── AcquisitionCard.jsx   # URL input + Cook/Nutrition toggle
+│       ├── CookIdentity.jsx      # Cook mode: title, timing, checkable ingredients
+│       ├── CookContent.jsx       # Cook mode: numbered preparation steps
+│       ├── RecipeSummary.jsx     # Nutrition mode: title, stats, favorite, scale selector
+│       ├── IngredientTable.jsx   # Nutrition mode: ingredient calorie breakdown
+│       ├── LoadingIndicator.jsx  # MUI CircularProgress spinner
+│       ├── FavoritesView.jsx     # Favorites screen scaffold (placeholder data)
+│       └── DevLabel.jsx          # Temporary yellow badges labeling UI regions
 ├── public/
 │   ├── icon-192.png          # Placeholder PWA icons
 │   └── icon-512.png
-├── vercel.json               # Routing config
+├── MUI_implementation.txt    # Original MUI migration plan (reference)
+├── vercel.json               # Minimal config (framework: vite)
 ├── vite.config.js            # Vite + PWA plugin config
-├── requirements.txt          # Python deps for serverless function
+├── requirements.txt          # Python deps for serverless functions
 └── .env.example              # Documents required USDA_API_KEY env var
 ```
+
+## UI Structure (MUI)
+
+The app uses Material UI with a dark theme (`#e94560` primary, `#1a1a2e` background). Components are labeled with yellow **DevLabel** badges during development for easy communication.
+
+- **AppBar** — Sticky top bar with app/recipe title, debug toggle (bug icon), favorites icon
+- **Acquisition** — Card with Cook/Nutrition toggle + URL input + Analyze button
+- **Identity** — Mode-dependent card:
+  - Cook: recipe title, prep/cook/total time, checkable ingredient list, favorite toggle
+  - Nutrition: recipe title, servings/kcal stats, favorite toggle, scale selector (½x–4x)
+- **Content** — Mode-dependent card:
+  - Cook: numbered preparation steps
+  - Nutrition: ingredient calorie breakdown with status dots and chips
+- **Favorites** — Separate view (placeholder) accessible via AppBar heart icon
+
+## Two Modes
+
+### Cook Mode (default)
+- Calls `POST /api/cook` — scrapes title, ingredients, instructions, timing
+- **No USDA lookup** — fast response
+- Ingredients shown as checkable list (tap to strikethrough)
+- Preparation steps shown as numbered cards
+
+### Nutrition Mode
+- Calls `POST /api/calculate` — full ingredient parsing + USDA calorie lookup
+- Shows calorie breakdown per ingredient with status dots (ok/skipped/not found)
+- Recipe scaling (½x, 1x, 2x, 3x, 4x) — frontend-only multiplication
 
 ## Key Decisions & Gotchas
 
@@ -47,26 +79,40 @@ RecipeApp_React/
 ### API key
 The USDA API key is stored as a Vercel environment variable (`USDA_API_KEY`), set for production, preview, and development. It is **not** in the source code. The key is: `moiGbWOpJ9Qi9Dfgivf83MIFtB87btfVL4DBcBwL`.
 
-### Debug panel
-`App.jsx` includes a `DebugDetails` component that shows HTTP status, request URL, and full server response (including Python tracebacks) when errors occur. This was added to aid debugging during deployment — can be removed later or hidden behind a flag.
+### vercel dev issues
+`vercel dev` has a known issue with Vite where the SPA catch-all rewrite causes Vite's HMR module requests to be served as `index.html`. The `vercel.json` was stripped to minimal config to mitigate, but local dev with the Python API still doesn't work reliably. **Current workflow: deploy to Vercel and test via the .app URL.**
 
-### Diagnostic import wrapper
-`calculate.py` wraps the `recipe_logic` import in try/except and returns the traceback as a JSON error if it fails. This was critical for diagnosing the NLTK issue. Can be simplified once stable.
+### Debug toggle
+The AppBar has a bug icon that toggles debug details on/off (on by default). When enabled, API errors show HTTP status, request URL, and full response body. This should be removed or defaulted to off before production release.
+
+### DevLabel badges
+Yellow badges label each UI region (AppBar, Acquisition, Identity, Content, Favorites) for development communication. These are hardcoded on and should be removed before production release.
+
+### Deleted files
+- `recipe_calculator.py` — Original 1397-line desktop app (customtkinter GUI). Deleted as it's unused by the React app. The backend logic lives in `api/recipe_logic.py`.
+- `src/components/UrlInput.jsx` — Replaced by `AcquisitionCard.jsx`
+- `src/components/ScaleSelector.jsx` — Absorbed into `RecipeSummary.jsx`
 
 ## What Works
 
-- Scraping recipes from allrecipes.com (tested with Chicken Tikka Masala)
-- Full ingredient parsing, unit conversion, and USDA calorie lookup
-- Recipe scaling (frontend-only — multiplies grams and kcal by scale factor)
-- PWA manifest and service worker generated by vite-plugin-pwa
+- **Cook mode**: scraping ingredients + instructions from allrecipes.com
+- **Nutrition mode**: full ingredient parsing, unit conversion, USDA calorie lookup
+- Recipe scaling (Nutrition mode, frontend-only)
+- Cook/Nutrition mode toggle
+- Checkable ingredient list in Cook mode
+- Favorites toggle button (state only, no persistence)
+- Debug toggle in AppBar
+- MUI dark theme with mobile-first layout
+- PWA manifest and service worker
 - Deployed and live on Vercel free tier
 
 ## What Hasn't Been Tested Yet
 
-- Other recipe sites (some may need Cloudflare bypass via cloudscraper)
+- Other recipe sites beyond allrecipes.com (some may need Cloudflare bypass)
 - PWA "Add to Home Screen" install flow on mobile
 - Offline behavior (service worker caches app shell, but API calls need network)
-- Edge cases: recipes with no servings, no ingredients found, very long ingredient lists
+- Edge cases: recipes with no servings, no ingredients, no instructions, very long lists
+- Cook mode timing display with various time formats from different sites
 
 ## Deployment
 
@@ -74,17 +120,25 @@ The USDA API key is stored as a Vercel environment variable (`USDA_API_KEY`), se
 # From RecipeApp_React/
 vercel --prod --yes          # Deploy to production
 vercel env ls                # Check env vars
-vercel logs <url>            # Check runtime logs
+vercel env pull              # Pull env vars for local use
 ```
 
 GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 
-## Potential Next Steps
+## Next Steps
 
-- **Test on more recipe sites** — the original app handles many edge cases; verify they work in the serverless environment
+### Near-term
+- **Wire up Favorites persistence** — localStorage or backend storage, connect to FavoritesView
+- **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
 - **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
-- **Add authentication** — if needed to protect API quota (easy: just a check at top of `do_POST`)
-- **Remove debug panel** — or hide behind a toggle once the app is stable
-- **Connect Vercel to GitHub** — currently deploying via CLI; connecting via Vercel dashboard enables auto-deploy on push (requires adding a "Login Connection" at vercel.com)
-- **Custom domain** — can be configured in Vercel dashboard
-- **Vercel function timeout** — default is 10s on free tier; some recipes with many ingredients + USDA lookups may be slow. Consider adding a loading progress indicator that shows ingredient-by-ingredient progress (would need streaming or websockets)
+- **Fix Nutrition mode scaling** — scale selector has known issues that need troubleshooting
+- **Fix vercel dev** — or document a local dev workflow that works
+
+### Future
+- **React Router** — replace state-based view switching with proper URL routing
+- **Desktop-specific layouts** — current layout is mobile-first only
+- **Visual polish** — beyond MUI defaults
+- **Remove DevLabel badges and debug toggle** — before production release
+- **Connect Vercel to GitHub** — enable auto-deploy on push
+- **Custom domain**
+- **Vercel function timeout** — 10s on free tier; Nutrition mode with many ingredients may be slow
