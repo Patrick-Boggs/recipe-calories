@@ -132,14 +132,24 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 - **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
 - **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
 - **Fix Nutrition mode scaling** — scale selector has known issues that need troubleshooting
+- **Checkable preparation steps in Cook mode** — tap to check off/strikethrough steps like the ingredient list
 - **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card
+- **Ingredient scaling in Cook mode** — scale selector for ingredient quantities (double/halve a recipe while cooking)
+- **Unit conversion toggle** — metric/imperial switch for ingredient quantities
+- **Error recovery UX** — retry button on failed requests without re-pasting the URL
+- **Clear/reset button** — clear loaded recipe and start fresh without refreshing the page
 - **Fix vercel dev** — or document a local dev workflow that works
 
 ### Future
 - **React Router** — replace state-based view switching with proper URL routing
 - **Desktop-specific layouts** — current layout is mobile-first only
 - **Visual polish** — beyond MUI defaults
+- **Selectable color themes + light/dark mode** — user-choosable theme palettes with light/dark toggle
 - **Remove DevLabel badges and debug toggle** — before production release
 - **Connect Vercel to GitHub** — enable auto-deploy on push
 - **Custom domain**
+- **Share recipe** — Web Share API to send a recipe to someone from mobile
+- **Recipe history** — auto-remember recently analyzed URLs
+- **Offline recipe cache** — save analyzed recipes to localStorage for viewing without network
+- **Print-friendly view** — clean layout for printing ingredient list + prep steps
 - **Vercel function timeout** — 10s on free tier; Nutrition mode with many ingredients may be slow
