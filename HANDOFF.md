@@ -132,6 +132,7 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 - **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
 - **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
 - **Fix Nutrition mode scaling** — scale selector has known issues that need troubleshooting
+- **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card
 - **Fix vercel dev** — or document a local dev workflow that works
 
 ### Future
