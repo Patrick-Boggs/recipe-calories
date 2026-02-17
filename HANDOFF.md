@@ -128,28 +128,27 @@ GitHub CLI (`gh`) and Vercel CLI (`vercel`) are both installed globally.
 ## Next Steps
 
 ### Near-term
-- **Wire up Favorites persistence** — localStorage or backend storage, connect to FavoritesView
-- **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
-- **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
-- **Fix Nutrition mode scaling** — scale selector has known issues that need troubleshooting
-- **Checkable preparation steps in Cook mode** — tap to check off/strikethrough steps like the ingredient list
-- **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card
-- **Ingredient scaling in Cook mode** — scale selector for ingredient quantities (double/halve a recipe while cooking)
-- **Unit conversion toggle** — metric/imperial switch for ingredient quantities
-- **Error recovery UX** — retry button on failed requests without re-pasting the URL
-- **Clear/reset button** — clear loaded recipe and start fresh without refreshing the page
-- **Fix vercel dev** — or document a local dev workflow that works
+1. **Fix Nutrition mode scaling** — scale selector has known issues that need troubleshooting
+2. **Error recovery UX** — retry button on failed requests without re-pasting the URL; clear/reset button to start fresh
+3. **Checkable preparation steps in Cook mode** — tap to check off/strikethrough steps like the ingredient list
+4. **Screen Wake Lock for Cook mode** — use Screen Wake Lock API to keep screen on while cooking, toggle in AppBar or Identity card
+5. **Ingredient scaling in Cook mode** — scale selector for ingredient quantities (double/halve a recipe while cooking)
+6. **Unit conversion toggle** — metric/imperial switch for ingredient quantities
+7. **Wire up Favorites persistence** — localStorage or backend storage, connect to FavoritesView
+8. **Test on more recipe sites** — verify both Cook and Nutrition modes work across sites
+9. **Replace placeholder PWA icons** — current ones are simple red circles on dark blue
+10. **Fix vercel dev** — or document a local dev workflow that works
 
 ### Future
-- **React Router** — replace state-based view switching with proper URL routing
-- **Desktop-specific layouts** — current layout is mobile-first only
-- **Visual polish** — beyond MUI defaults
-- **Selectable color themes + light/dark mode** — user-choosable theme palettes with light/dark toggle
-- **Remove DevLabel badges and debug toggle** — before production release
-- **Connect Vercel to GitHub** — enable auto-deploy on push
-- **Custom domain**
-- **Share recipe** — Web Share API to send a recipe to someone from mobile
-- **Recipe history** — auto-remember recently analyzed URLs
-- **Offline recipe cache** — save analyzed recipes to localStorage for viewing without network
-- **Print-friendly view** — clean layout for printing ingredient list + prep steps
-- **Vercel function timeout** — 10s on free tier; Nutrition mode with many ingredients may be slow
+1. **Visual polish** — typography, spacing, transitions, empty states — beyond MUI defaults
+2. **Selectable color themes + light/dark mode** — user-choosable theme palettes with light/dark toggle
+3. **Offline recipe cache** — save analyzed recipes to localStorage for viewing without network (crucial for kitchens with spotty wifi)
+4. **Recipe history** — auto-remember recently analyzed URLs
+5. **Share recipe** — Web Share API to send a recipe to someone from mobile
+6. **Print-friendly view** — clean layout for printing ingredient list + prep steps
+7. **React Router** — replace state-based view switching with proper URL routing
+8. **Desktop-specific layouts** — current layout is mobile-first only
+9. **Remove DevLabel badges and debug toggle** — before production release
+10. **Connect Vercel to GitHub** — enable auto-deploy on push
+11. **Custom domain**
+12. **Vercel function timeout** — 10s on free tier; Nutrition mode with many ingredients may be slow
