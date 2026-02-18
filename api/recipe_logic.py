@@ -399,6 +399,50 @@ def _fallback_scrape_html(html):
     return title, servings_text, ingredients, instructions
 
 
+# Matches common measurement units and food words — used to distinguish real
+# ingredients from garbage scraped off non-recipe pages.
+_RECIPE_SIGNAL_RE = re.compile(
+    r"\b(cups?|tbsp|tablespoons?|tsp|teaspoons?|oz|ounces?|pounds?|lbs?|"
+    r"grams?|kg|ml|liters?|pinch|dash|cloves?|slices?|cans?|bunch|sprigs?|"
+    r"heads?|stalks?|"
+    r"flour|sugar|salt|butter|oil|eggs?|milk|cream|water|chicken|beef|pork|"
+    r"onions?|garlic|pepper|cheese|rice|pasta|sauce|broth|stock|vinegar|"
+    r"baking|vanilla|cinnamon|cumin|paprika|oregano|basil|thyme|"
+    r"lemon|tomato|potato|carrot|celery|mushroom|honey|soy|ginger)\b",
+    re.IGNORECASE,
+)
+
+
+def validate_recipe_data(ingredients, instructions, scraper_tier):
+    """Check that scraped data looks like a real recipe.
+
+    Tier 1/2 (JSON-LD schema) are trusted. Tier 3 (regex fallback) gets
+    heuristic checks for food/measurement words.
+
+    Raises ValueError with a user-friendly message if validation fails.
+    """
+    if not ingredients and not instructions:
+        raise ValueError(
+            "No recipe found on this page. Try pasting a URL from a recipe website."
+        )
+
+    if scraper_tier in (1, 2):
+        return  # page declared Recipe schema — trust it
+
+    # Tier 3: require at least 2 ingredients with food/measurement signal
+    if len(ingredients) < 2:
+        raise ValueError(
+            "This page doesn't appear to contain a recipe. "
+            "Try pasting a URL from a recipe website."
+        )
+
+    if not any(_RECIPE_SIGNAL_RE.search(ing) for ing in ingredients):
+        raise ValueError(
+            "This page doesn't appear to contain a recipe. "
+            "Try pasting a URL from a recipe website."
+        )
+
+
 def scrape_recipe(url):
     """Fetch and parse a recipe from a URL.
 
@@ -421,12 +465,15 @@ def scrape_recipe(url):
     if resp.status_code != 500 or len(resp.text) < 1000:
         resp.raise_for_status()
 
+    scraper_tier = 3
     try:
         scraper = scrape_html(resp.text, org_url=url)
+        scraper_tier = 1
     except Exception:
         try:
             # Site not directly supported - try generic mode (reads JSON-LD / microdata)
             scraper = scrape_html(resp.text, org_url=url, supported_only=False)
+            scraper_tier = 2
         except Exception:
             scraper = None
 
@@ -441,7 +488,10 @@ def scrape_recipe(url):
 
     if not scraper or not ingredients:
         # No schema found — fall back to plain HTML extraction
+        scraper_tier = 3
         title, yields_str, ingredients, _instructions = _fallback_scrape_html(resp.text)
+
+    validate_recipe_data(ingredients or [], [], scraper_tier)
 
     servings = _parse_servings(yields_str)
 

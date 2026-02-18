@@ -20,7 +20,7 @@ from recipe_scrapers import scrape_html
 # Point NLTK to bundled data before importing recipe_logic
 # (recipe_logic imports ingredient-parser-nlp which needs NLTK data)
 os.environ["NLTK_DATA"] = str(pathlib.Path(__file__).parent / "nltk_data")
-from api.recipe_logic import _fallback_scrape_html, _normalize_raw_ingredient
+from api.recipe_logic import _fallback_scrape_html, _normalize_raw_ingredient, validate_recipe_data
 
 
 class handler(BaseHTTPRequestHandler):
@@ -59,14 +59,14 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(200, result)
         except requests.exceptions.HTTPError as e:
             status = e.response.status_code if e.response is not None else 'unknown'
-            self._send_json(403, {
-                "error": f"This website blocked our request (HTTP {status}). Please try a different URL.",
-                "blocked": True,
+            self._send_json(400, {
+                "error": "This website blocked our request. Please try a different URL.",
+                "debug": f"HTTP {status}",
             })
         except ValueError as e:
             self._send_json(400, {"error": str(e)})
         except Exception:
-            self._send_json(500, {"error": f"Failed to scrape recipe: {traceback.format_exc()}"})
+            self._send_json(500, {"error": "Something went wrong while loading this recipe. Please try again.", "debug": traceback.format_exc()})
 
 
 def scrape_cook_data(url):
@@ -87,11 +87,14 @@ def scrape_cook_data(url):
     if resp.status_code != 500 or len(resp.text) < 1000:
         resp.raise_for_status()
 
+    scraper_tier = 3
     try:
         scraper = scrape_html(resp.text, org_url=url)
+        scraper_tier = 1
     except Exception:
         try:
             scraper = scrape_html(resp.text, org_url=url, supported_only=False)
+            scraper_tier = 2
         except Exception:
             scraper = None
 
@@ -134,6 +137,7 @@ def scrape_cook_data(url):
 
     # Fall back to plain HTML extraction if scraper missed ingredients OR instructions
     if not result["ingredients"] or not result["instructions"]:
+        scraper_tier = 3
         title, _servings, ingredients, instructions = _fallback_scrape_html(resp.text)
         result["title"] = result["title"] or title
         if not result["ingredients"]:
@@ -141,8 +145,7 @@ def scrape_cook_data(url):
         if not result["instructions"]:
             result["instructions"] = instructions
 
-    if not result["ingredients"] and not result["instructions"]:
-        raise ValueError("No ingredients or instructions found for this recipe.")
+    validate_recipe_data(result["ingredients"], result["instructions"], scraper_tier)
 
     result["ingredients"] = [_normalize_raw_ingredient(ing) for ing in result["ingredients"]]
 

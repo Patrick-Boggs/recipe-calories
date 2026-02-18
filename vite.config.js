@@ -33,5 +33,12 @@ export default defineConfig({
       }
     })
   ],
-  server: {}
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://recipe-calories-ten.vercel.app',
+        changeOrigin: true,
+      },
+    },
+  }
 })

@@ -43,7 +43,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if _import_error:
-            self._send_json(500, {"error": f"Server import error:\n{_import_error}"})
+            self._send_json(500, {"error": "The server encountered a configuration error. Please try again later.", "debug": str(_import_error)})
             return
 
         try:
@@ -55,7 +55,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         if not USDA_API_KEY:
-            self._send_json(500, {"error": "Server misconfigured: USDA_API_KEY environment variable not set."})
+            self._send_json(500, {"error": "The server encountered a configuration error. Please try again later.", "debug": "USDA_API_KEY environment variable not set."})
             return
 
         url = data.get("url", "").strip()
@@ -76,11 +76,11 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(200, result)
         except requests.exceptions.HTTPError as e:
             status = e.response.status_code if e.response is not None else 'unknown'
-            self._send_json(403, {
-                "error": f"This website blocked our request (HTTP {status}). Please try a different URL.",
-                "blocked": True,
+            self._send_json(400, {
+                "error": "This website blocked our request. Please try a different URL.",
+                "debug": f"HTTP {status}",
             })
         except ValueError as e:
             self._send_json(400, {"error": str(e)})
         except Exception:
-            self._send_json(500, {"error": f"Failed to process recipe: {traceback.format_exc()}"})
+            self._send_json(500, {"error": "Something went wrong while analyzing this recipe. Please try again.", "debug": traceback.format_exc()})
