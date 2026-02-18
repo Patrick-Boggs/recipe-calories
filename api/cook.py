@@ -20,7 +20,7 @@ from recipe_scrapers import scrape_html
 # Point NLTK to bundled data before importing recipe_logic
 # (recipe_logic imports ingredient-parser-nlp which needs NLTK data)
 os.environ["NLTK_DATA"] = str(pathlib.Path(__file__).parent / "nltk_data")
-from api.recipe_logic import _fallback_scrape_html
+from api.recipe_logic import _fallback_scrape_html, _normalize_raw_ingredient
 
 
 class handler(BaseHTTPRequestHandler):
@@ -143,5 +143,7 @@ def scrape_cook_data(url):
 
     if not result["ingredients"] and not result["instructions"]:
         raise ValueError("No ingredients or instructions found for this recipe.")
+
+    result["ingredients"] = [_normalize_raw_ingredient(ing) for ing in result["ingredients"]]
 
     return result

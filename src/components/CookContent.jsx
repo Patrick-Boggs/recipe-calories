@@ -1,13 +1,21 @@
+import { useState } from 'react'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import Stack from '@mui/material/Stack'
+import Checkbox from '@mui/material/Checkbox'
 import DevLabel from './DevLabel'
 
 export default function CookContent({ instructions }) {
+  const [checked, setChecked] = useState({})
+
   if (!instructions || instructions.length === 0) {
     return null
+  }
+
+  function toggleStep(index) {
+    setChecked((prev) => ({ ...prev, [index]: !prev[index] }))
   }
 
   return (
@@ -25,21 +33,41 @@ export default function CookContent({ instructions }) {
           {instructions.map((step, i) => (
             <Box
               key={i}
+              onClick={() => toggleStep(i)}
               sx={{
                 bgcolor: 'background.default',
                 borderRadius: 1.5,
                 p: 2,
+                cursor: 'pointer',
+                opacity: checked[i] ? 0.4 : 1,
+                transition: 'all 0.2s',
               }}
             >
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <Checkbox
+                  checked={!!checked[i]}
+                  tabIndex={-1}
+                  disableRipple
+                  size="small"
+                  sx={{ p: 0, mt: '-2px' }}
+                />
+                <Typography
+                  variant="caption"
+                  color="primary"
+                  fontWeight={700}
+                >
+                  Step {i + 1}
+                </Typography>
+              </Box>
               <Typography
-                variant="caption"
-                color="primary"
-                fontWeight={700}
-                sx={{ display: 'block', mb: 0.5 }}
+                variant="body2"
+                sx={{
+                  lineHeight: 1.6,
+                  ml: 4,
+                  textDecoration: checked[i] ? 'line-through' : 'none',
+                  transition: 'all 0.2s',
+                }}
               >
-                Step {i + 1}
-              </Typography>
-              <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
                 {step}
               </Typography>
             </Box>
