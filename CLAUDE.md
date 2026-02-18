@@ -25,10 +25,14 @@ Two modes fire **in parallel** on Analyze — results cached in state so mode sw
 - **Cook mode** (default): `POST /api/cook` — scrapes title, ingredients, instructions, timing. No USDA lookup.
 - **Nutrition mode**: `POST /api/calculate` — full ingredient parsing + USDA calorie lookup via `recipe_logic.py`. Recipe scaling (½x–4x) is frontend-only multiplication; per-serving kcal stays fixed.
 
+**HTTP fetch with anti-bot fallback:** Both endpoints first try `requests` with browser-like headers, then retry with `cloudscraper` on 403/500. Some sites (e.g., cleobuttera.com) return 500 with valid HTML — these are accepted if the response body is >1000 chars. Blocked sites return `{"error": "...", "blocked": true}` and the frontend shows an amber warning instead of a red error.
+
 **Recipe scraping 3-tier fallback** (shared by both endpoints):
 1. `recipe-scrapers` supported mode (JSON-LD/Recipe schema) — allrecipes.com and most structured sites
 2. `recipe-scrapers` generic mode (`supported_only=False`) — any site with JSON-LD/microdata
 3. `_fallback_scrape_html()` — regex HTML extraction for unstructured sites (e.g., Smitten Kitchen). Comment sections are decomposed from the DOM before instruction scanning. Instructions scoped to `.entry-content` or `.post-content` when available.
+
+**Fallback trigger:** Cook mode runs HTML fallback if **either** ingredients or instructions are missing (not only when both are). Only fills in the missing piece — preserves what tier 2 already found.
 
 **Ingredient normalization pipeline** (`_normalize_raw_ingredient()` in `recipe_logic.py`):
 1. Smart quotes → plain apostrophes
@@ -41,7 +45,7 @@ Two modes fire **in parallel** on Analyze — results cached in state so mode sw
 - Strips "or"/"for" clauses, recipe adjectives (fresh, melted, chopped, etc.), dietary labels (low-sodium, organic, boneless, etc.)
 
 **Built-in lookup tables** in `recipe_logic.py`:
-- `DENSITY_G_PER_CUP` (~117 entries) — volume-to-weight conversion
+- `DENSITY_G_PER_CUP` (~124 entries) — volume-to-weight conversion (includes beans, chickpeas, lentils)
 - `WEIGHT_PER_ITEM` (~46 entries) — per-item weights for countable ingredients with size variants
 - `KNOWN_KCAL_PER_100G` (~125 entries) — pre-computed calories to avoid USDA API mismatches
 
@@ -56,18 +60,19 @@ Two modes fire **in parallel** on Analyze — results cached in state so mode sw
 - **Vercel free tier:** 10s function timeout — Nutrition mode with many ingredients may be slow.
 
 ## Known Issues
-- **SK instruction extraction:** Regex approach struggles with Smitten Kitchen's inconsistent formatting. Not all recipes use "Make X:" prefixes or start with cooking verbs.
 - **SK missing ingredients:** Sub-section ingredient lists (e.g., separate dough/filling) — only the largest block is captured.
-- **White beans density:** Uses water density fallback (912g for 2 cups). Real cooked beans ~184g/cup. Needs density table entry.
 - **SK servings null:** No structured serving counts on Smitten Kitchen.
 - **Cook mode raw string artifacts:** `all- purpose`, `sodium- free` — normalization only runs in the Nutrition pipeline, not Cook mode.
+- **Some sites fully blocked:** Sites requiring JavaScript execution (headless browser) can't be scraped — user sees amber warning to try a different URL.
 
 ## Testing
 Use `/testrecipe <url>` to test a recipe URL against both live endpoints and check for known issues.
 
 **Tested sites:**
 - **allrecipes.com** — tier 1 (`recipe-scrapers`). Cook + Nutrition both pass.
-- **smittenkitchen.com** — tier 3 (HTML fallback). Nutrition: ingredients parse with `status: "ok"`. Cook: instruction extraction works on some recipes but not all.
+- **smittenkitchen.com** — tier 2 ingredients + tier 3 instruction fallback. Cook + Nutrition both work.
+- **cleobuttera.com** — returns 500 with valid HTML; accepted and parsed successfully via tier 1/2.
+- **foodnetwork.com** — blocked (403). Shows amber warning to user.
 
 ## Task Tracking
 See `todo.md` for upcoming tasks and roadmap.
