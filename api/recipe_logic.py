@@ -413,11 +413,13 @@ def scrape_recipe(url):
         "Upgrade-Insecure-Requests": "1",
     }
     resp = requests.get(url, headers=headers, timeout=15)
-    if resp.status_code == 403:
-        # Cloudflare-protected site — retry with cloudscraper
+    if resp.status_code in (403, 500):
+        # Anti-bot protected site — retry with cloudscraper
         scraper_session = cloudscraper.create_scraper()
         resp = scraper_session.get(url, timeout=15)
-    resp.raise_for_status()
+    # Some sites return 500 but still send full HTML with recipe data
+    if resp.status_code != 500 or len(resp.text) < 1000:
+        resp.raise_for_status()
 
     try:
         scraper = scrape_html(resp.text, org_url=url)
