@@ -124,12 +124,14 @@ def scrape_cook_data(url):
         except Exception:
             pass
 
-    # Fall back to plain HTML extraction if scraper failed or found nothing
-    if not result["ingredients"] and not result["instructions"]:
+    # Fall back to plain HTML extraction if scraper missed ingredients OR instructions
+    if not result["ingredients"] or not result["instructions"]:
         title, _servings, ingredients, instructions = _fallback_scrape_html(resp.text)
         result["title"] = result["title"] or title
-        result["ingredients"] = ingredients
-        result["instructions"] = instructions
+        if not result["ingredients"]:
+            result["ingredients"] = ingredients
+        if not result["instructions"]:
+            result["instructions"] = instructions
 
     if not result["ingredients"] and not result["instructions"]:
         raise ValueError("No ingredients or instructions found for this recipe.")
