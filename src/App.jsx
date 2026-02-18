@@ -103,6 +103,7 @@ export default function App() {
   const [cookLoading, setCookLoading] = useState(false)
   const [nutritionLoading, setNutritionLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [blocked, setBlocked] = useState(false)
   const [debug, setDebug] = useState(null)
   const [scale, setScale] = useState(1)
   const [favorited, setFavorited] = useState(false)
@@ -124,13 +125,14 @@ export default function App() {
       throw { userError: 'Server returned non-JSON response.', debug: { status: res.status, url, body: rawText } }
     }
     if (!res.ok) {
-      throw { userError: data.error || 'Something went wrong.', debug: { status: res.status, url, body: rawText } }
+      throw { userError: data.error || 'Something went wrong.', blocked: data.blocked || false, debug: { status: res.status, url, body: rawText } }
     }
     return data
   }
 
   function handleAnalyze(url) {
     setError(null)
+    setBlocked(false)
     setDebug(null)
     setRecipe(null)
     setCookData(null)
@@ -144,6 +146,7 @@ export default function App() {
       .catch((err) => {
         if (mode === 'cook') {
           setError(err.userError || 'Failed to connect to server.')
+          setBlocked(err.blocked || false)
           setDebug(err.debug || { status: null, url, body: String(err) })
         }
       })
@@ -154,6 +157,7 @@ export default function App() {
       .catch((err) => {
         if (mode === 'nutrition') {
           setError(err.userError || 'Failed to connect to server.')
+          setBlocked(err.blocked || false)
           setDebug(err.debug || { status: null, url, body: String(err) })
         }
       })
@@ -221,7 +225,7 @@ export default function App() {
             {loading && !error && <LoadingIndicator />}
 
             {!loading && error && (
-              <Alert severity="error" variant="outlined">
+              <Alert severity={blocked ? "warning" : "error"} variant="outlined">
                 {error}
                 {debugEnabled && debug && <DebugDetails debug={debug} />}
               </Alert>

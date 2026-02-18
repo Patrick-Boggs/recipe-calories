@@ -57,6 +57,12 @@ class handler(BaseHTTPRequestHandler):
         try:
             result = scrape_cook_data(url)
             self._send_json(200, result)
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 'unknown'
+            self._send_json(403, {
+                "error": f"This website blocked our request (HTTP {status}). Please try a different URL.",
+                "blocked": True,
+            })
         except ValueError as e:
             self._send_json(400, {"error": str(e)})
         except Exception:

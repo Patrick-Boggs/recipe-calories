@@ -10,6 +10,7 @@ import json
 import os
 import traceback
 from http.server import BaseHTTPRequestHandler
+import requests
 
 # Point NLTK to bundled data before importing recipe_logic
 # (ingredient-parser-nlp needs averaged_perceptron_tagger_eng)
@@ -73,6 +74,12 @@ class handler(BaseHTTPRequestHandler):
             for ing in result.get("ingredients", []):
                 ing.pop("amounts", None)
             self._send_json(200, result)
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 'unknown'
+            self._send_json(403, {
+                "error": f"This website blocked our request (HTTP {status}). Please try a different URL.",
+                "blocked": True,
+            })
         except ValueError as e:
             self._send_json(400, {"error": str(e)})
         except Exception:
