@@ -102,6 +102,13 @@ DENSITY_G_PER_CUP = {
     "miso paste": 275,
     "hot sauce": 240,
     "barbecue sauce": 280,
+    "white beans": 184,
+    "cannellini beans": 184,
+    "black beans": 172,
+    "kidney beans": 177,
+    "pinto beans": 171,
+    "chickpeas": 164,
+    "lentils": 198,
 }
 
 # ML per US cup (for density math)
